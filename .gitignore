@@ -1,0 +1,11 @@
+*.out
+bin/
+build/
+*.o
+tests
+benchmark/
+bench
+cachegrind.out.*
+*.swp
+*.gch
+*.so

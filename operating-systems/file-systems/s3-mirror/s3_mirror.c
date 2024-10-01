@@ -60,23 +60,6 @@ void s3m_set_prefix(char *prefix, const char *path) {
     } else {
         strcpy(prefix, path);
     }
-    
-    /*
-    if (path[0] == '/') {
-        strncpy(prefix, path + 1, sizeof(prefix) - 1);
-    } else {
-        strncpy(prefix, path, sizeof(prefix) - 1);
-    }
-
-    prefix[sizeof(prefix) - 1] = '\0';
-    */
-
-    /*
-    char *lastSlash = strrchr(prefix, '/');
-
-    if (lastSlash != NULL)
-        *lastSlash = '\0';
-    */
 }
 
 void s3m_set_dir_prefix(char *prefix, const char *path) {
@@ -95,7 +78,7 @@ void s3m_set_dir_prefix(char *prefix, const char *path) {
 }
 
 void s3m_set_fbuf(char *fbuf, char *prefix, char *key) {
-    memset(fbuf, 0, sizeof(char) * 1024);
+    memset(fbuf, 0, sizeof(char) * MAX_KEY_LEN);
 
     if (strncmp(key, prefix, strlen(prefix)) == 0) {
         strncpy(fbuf, key + strlen(prefix), sizeof(fbuf) - 1);
@@ -115,7 +98,7 @@ static int s3m_getattr(const char *path, struct stat *stbuf,
 		       struct fuse_file_info *fi) {
     printf("s3m_getattr: %s\n", path);
     int i, res = 0;
-    char prefix[1024];
+    char prefix[MAX_KEY_LEN];
 
     memset(stbuf, 0, sizeof(struct stat));
 
@@ -181,7 +164,7 @@ static int s3m_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		       off_t offset, struct fuse_file_info *fi,
 		       enum fuse_readdir_flags flags) {
     int i;
-    char prefix[1024], fbuf[1024];
+    char prefix[MAX_KEY_LEN], fbuf[MAX_KEY_LEN];
 
     printf("s3m_readdir: %s\n", path);
 
@@ -211,6 +194,16 @@ static int s3m_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     return 0;
 }
 
+static int s3m_read(const char *path, char *buf, size_t size, off_t offset,
+		    struct fuse_file_info *fi) {
+
+    const char *content = s3m_read_object(options.bucket, path);
+
+    memcpy(buf, content + offset, size);
+
+    return strlen(content) - offset; 
+}
+
 void s3m_destroy(void *ptr) {
     printf("s3m_destroy\n");
     s3m_shutdown_api();
@@ -220,6 +213,7 @@ static const struct fuse_operations s3m_oper = {
   .init    = s3m_init,
   .getattr = s3m_getattr,
   .readdir = s3m_readdir,
+  .read    = s3m_read,
   .destroy = s3m_destroy
 };
 

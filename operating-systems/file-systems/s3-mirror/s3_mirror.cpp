@@ -1,8 +1,10 @@
 #include <aws/core/Aws.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/ListObjectsV2Request.h>
+#include <aws/s3/model/GetObjectRequest.h>
 #include <aws/s3/model/CommonPrefix.h>
 #include <iostream>
+#include <fstream>
 #include <aws/core/auth/AWSCredentialsProviderChain.h>
 #include "s3_mirror.h"
 using namespace Aws;
@@ -17,6 +19,8 @@ extern "C" {
     void s3m_shutdown_api();
 
     s3m_object_list_t *s3m_list_objects(const char *bucket, const char *prefix);    
+
+    const char *s3m_read_object(const char *bucket, const char *key);
 }
 
 void s3m_init_api() {
@@ -30,8 +34,8 @@ void s3m_shutdown_api() {
 s3m_object_list_t *s3m_list_objects(const char *bucket, const char *prefix) {
     std::cout << "    cpp prefix: " << prefix << std::endl;
 
-    static Aws::Client::ClientConfiguration clientConfig;
-    static Aws::S3::S3Client s3Client(clientConfig);
+    Aws::Client::ClientConfiguration clientConfig;
+    Aws::S3::S3Client s3Client(clientConfig);
     
     Aws::S3::Model::ListObjectsV2Request request;
 
@@ -93,4 +97,29 @@ s3m_object_list_t *s3m_list_objects(const char *bucket, const char *prefix) {
     }
 
     return list;
+}
+
+const char *s3m_read_object(const char *bucket, const char *key) {
+    std::cout << "    cpp key: " << key << std::endl;
+
+    Aws::Client::ClientConfiguration clientConfig;
+    Aws::S3::S3Client s3Client(clientConfig);
+    
+    Aws::S3::Model::GetObjectRequest request;
+    request.WithBucket(bucket).WithKey(key);
+
+    Aws::S3::Model::GetObjectOutcome outcome =
+        s3Client.GetObject(request);
+
+    if (!outcome.IsSuccess()) {
+        const Aws::S3::S3Error &err = outcome.GetError();
+        std::cerr << "Error: getObject: " <<
+                  err.GetExceptionName() << ": " << err.GetMessage() << std::endl;
+
+        return nullptr;
+    }
+
+    std::stringstream ss;
+    ss << outcome.GetResult().GetBody().rdbuf();
+    return ss.str().c_str();
 }

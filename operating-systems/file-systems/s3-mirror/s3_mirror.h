@@ -22,6 +22,7 @@ extern "C" {
     void s3m_init_api();
     void s3m_shutdown_api();
     s3m_object_list_t *s3m_list_objects(const char *bucket, const char *prefix); 
+    const char *s3m_read_object(const char *bucket, const char *key);
 #ifdef __cplusplus
 }
 #endif

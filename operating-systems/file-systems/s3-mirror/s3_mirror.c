@@ -13,14 +13,12 @@
 #include "s3_mirror.h"
 
 static struct options {
-	const char *bucket;
 	int show_help;
 } options;
 
 #define OPTION(t, p)                           \
     { t, offsetof(struct options, p), 1 }
 static const struct fuse_opt option_spec[] = {
-	OPTION("--bucket=%s", bucket),
 	OPTION("-h", show_help),
 	OPTION("--help", show_help),
 	FUSE_OPT_END
@@ -30,8 +28,11 @@ static void *s3m_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
 {
     printf("s3m_init\n");
-	s3m_init_api();
-    return NULL;
+	fuse_get_context();
+
+    s3m_init_api();
+
+    return BB_DATA;
 }
 
 void s3m_free_object_list(s3m_object_list_t *list) {
@@ -63,16 +64,7 @@ void s3m_set_prefix(char *prefix, const char *path) {
 }
 
 void s3m_set_dir_prefix(char *prefix, const char *path) {
-    if (strcmp(path, "/") == 0) {
-        prefix[0] = '\0';
-        return;
-    }
-
-    if (path[0] == '/') {
-        strcpy(prefix, path + 1);
-    } else {
-        strcpy(prefix, path);
-    }
+    s3m_set_prefix(prefix, path);    
 
     strcat(prefix, "/");
 }
@@ -116,7 +108,7 @@ static int s3m_getattr(const char *path, struct stat *stbuf,
 
     s3m_set_prefix(prefix, path);
 
-    s3m_object_list_t *list = s3m_list_objects(options.bucket, prefix);
+    s3m_object_list_t *list = s3m_list_objects(BB_DATA->bucket, prefix);
 
     if (list == NULL) {
         printf("list NULL\n");
@@ -173,7 +165,7 @@ static int s3m_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     s3m_set_dir_prefix(prefix, path);
 
-    s3m_object_list_t *list = s3m_list_objects(options.bucket, prefix);
+    s3m_object_list_t *list = s3m_list_objects(BB_DATA->bucket, prefix);
 
     for (i = 0; i < list->num_dirs; i++) {
         s3m_set_fbuf(fbuf, prefix, list->dirs[i]);
@@ -197,7 +189,7 @@ static int s3m_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 static int s3m_read(const char *path, char *buf, size_t size, off_t offset,
 		    struct fuse_file_info *fi) {
 
-    const char *content = s3m_read_object(options.bucket, path);
+    const char *content = s3m_read_object(BB_DATA->bucket, path);
 
     memcpy(buf, content + offset, size);
 
@@ -206,6 +198,7 @@ static int s3m_read(const char *path, char *buf, size_t size, off_t offset,
 
 void s3m_destroy(void *ptr) {
     printf("s3m_destroy\n");
+    free(ptr);
     s3m_shutdown_api();
 }
 
@@ -219,13 +212,26 @@ static const struct fuse_operations s3m_oper = {
 
 static void show_help(const char *progname)
 {
-	printf("usage: %s [options] <mountpoint>\n\n", progname);
+	printf("usage: %s [options] <bucket> <mountpoint>\n\n", progname);
 }
 
 int main(int argc, char *argv[]) {
-    struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+    if ((argc < 3) || (argv[argc-2][0] == '-') || (argv[argc-1][0] == '-'))
+    {
+        show_help(argv[0]);
+        return 1;
+    }
+
+    struct s3m_state *state;
+    state = malloc(sizeof(struct s3m_state));
     
-    options.bucket = strdup("");
+    state->bucket = argv[argc - 2];
+    
+    argv[argc-2] = argv[argc-1];
+    argv[argc-1] = NULL;
+    argc--;
+
+    struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
     if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1)
 		return 1;
@@ -236,7 +242,7 @@ int main(int argc, char *argv[]) {
 		args.argv[0][0] = '\0';
 	}
 
-    int ret = fuse_main(args.argc, args.argv, &s3m_oper, NULL);
+    int ret = fuse_main(args.argc, args.argv, &s3m_oper, state);
     fuse_opt_free_args(&args);
 
     printf("OK\n");

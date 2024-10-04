@@ -9,3 +9,4 @@ cachegrind.out.*
 *.swp
 *.gch
 *.so
+s3m

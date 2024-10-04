@@ -66,7 +66,8 @@ void s3m_set_prefix(char *prefix, const char *path) {
 void s3m_set_dir_prefix(char *prefix, const char *path) {
     s3m_set_prefix(prefix, path);    
 
-    strcat(prefix, "/");
+    if (strcmp(prefix, "") != 0)
+        strcat(prefix, "/");
 }
 
 void s3m_set_fbuf(char *fbuf, char *prefix, char *key) {

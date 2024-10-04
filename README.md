@@ -2,7 +2,7 @@
 
 Small application for mounting and exploring a S3 Bucket in your favourite terminal.
 
-Uses [FUSE] (https://github.com/libfuse/libfuse) and AWS C++ SDK under the covers.
+Uses [FUSE](https://github.com/libfuse/libfuse) and AWS C++ SDK under the covers.
 
 ## Building the Application
 
